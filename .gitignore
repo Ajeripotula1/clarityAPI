@@ -1,0 +1,92 @@
+# ----------------------
+# Python
+# ----------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# ----------------------
+# Virtual Environments
+# ----------------------
+venv/
+.venv/
+
+# ----------------------
+# Environment Variables
+# ----------------------
+.env
+.env.*
+*.env
+!example.env  # track example.env for users
+
+# ----------------------
+# Logs
+# ----------------------
+*.log
+logs/
+
+# ----------------------
+# OS Files
+# ----------------------
+.DS_Store
+Thumbs.db
+
+# ----------------------
+# IDE / Editor
+# ----------------------
+.vscode/
+.idea/
+
+# ----------------------
+# Build / Packaging
+# ----------------------
+build/
+dist/
+*.egg-info/
+
+# ----------------------
+# Jupyter Notebooks
+# ----------------------
+.ipynb_checkpoints/
+
+# ----------------------
+# Chroma DB / Vector Stores
+# ----------------------
+chroma/
+chroma_db/
+*.db
+*.sqlite3
+*.pkl
+
+# ----------------------
+# Knowledge Base / Uploaded PDFs
+# ----------------------
+knowledgeBase/
+
+# ----------------------
+# Uploaded Files / Temp Data
+# ----------------------
+uploads/
+data/
+tmp/
+
+# ----------------------
+# Model Files
+# ----------------------
+*.pt
+*.pth
+*.bin
+*.onnx
+
+# ----------------------
+# Cache / Temporary
+# ----------------------
+.cache/
+
+# ----------------------
+# Redis Persistence (local dev)
+# ----------------------
+dump.rdb
+appendonly.aof
