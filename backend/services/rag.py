@@ -36,7 +36,7 @@ def update_chat_memory(updated_memory:Dict):
     global chat_memory
     chat_memory = updated_memory   
     
-    
+
 
 
 def generate_system_message(memory:Dict):
