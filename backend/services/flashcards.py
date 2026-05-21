@@ -23,7 +23,7 @@ async def generateFlashcards(file_name)-> list[dict]:
     summary = await summarize_file(file_name)
     # prompt LLM to generate Q&A pairs for user 
     prompt = f"""
-        Based on the following summary of a document, generate 15 flashcards in JSON format. Each flashcard should have a **concise question and answer** that helps the user study key ideas asnd definitions from the summary.
+        Based on the following summary of a document, generate 15 flashcards in JSON format. Each flashcard should have a **concise question and answer** that helps the user study key ideas and definitions from the summary.
         
         Return a list of flashcards like this:
         [

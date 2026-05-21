@@ -1,7 +1,12 @@
 from fastapi import FastAPI
 from api import rag, upload, summary, flashcard
+from database import engine, Base
+import db_models
 # main FastAPI instance
 app = FastAPI()
+
+# look at all ORM models and create matching PostgreSQL tables
+Base.metadata.create_all(bind=engine)
 
 # include the router
 app.include_router(rag.router)
