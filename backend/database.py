@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker,declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
 import os
 
@@ -10,13 +10,17 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("Database URL not found in environment variable")
 
-# Create SQL Alchemy Engine
+# Create SQL Alchemy Engine (connection manager)
 engine = create_engine(DATABASE_URL)
 
 # Create Session Local client for database operations 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(
+    autocommit=False, 
+    autoflush=False, 
+    bind=engine
+)
 
-# Base class for declarative models 
+# Base class for declarative models (track ORM models)
 Base = declarative_base()
 
 # Creates database session and yields to caller
