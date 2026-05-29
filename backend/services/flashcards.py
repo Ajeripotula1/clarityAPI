@@ -7,10 +7,10 @@ import re, json, os
 
 ttl = os.getenv("MEMORY_TTL")
 
-async def generateFlashcards(file_name)-> list[dict]:
+async def generateFlashcards(file_name,user)-> list[dict]:
     """Generate Flashcard (Q&A pairs) based on summary for a document"""
     # check if we have recently cached flashcards 
-    cache_key = f"flashcards:{file_name}"
+    cache_key = f"flashcards:{user}:{file_name}"
     cached = await redis.get(cache_key)
     if cached:
         print("*** FLASHCARDS EXISTS IN CACHE ***")
@@ -20,7 +20,7 @@ async def generateFlashcards(file_name)-> list[dict]:
             }
     
     # query summarize_file to get cached or newly generated summary for the document 
-    summary = await summarize_file(file_name)
+    summary = await summarize_file(file_name,user)
     # prompt LLM to generate Q&A pairs for user 
     prompt = f"""
         Based on the following summary of a document, generate 15 flashcards in JSON format. Each flashcard should have a **concise question and answer** that helps the user study key ideas and definitions from the summary.

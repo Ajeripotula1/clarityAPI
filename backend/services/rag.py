@@ -55,19 +55,27 @@ def generate_system_message(memory:Dict):
     return system_msg
 
 # 4. query the vector store
-def query_vector_store(query: str, k: int=k_docs)-> dict:
+def query_vector_store(query: str, user:str, k: int=k_docs)-> dict:
     """Query the vector store for relevant documents based on the input query."""
     if not query:
         return {"ok": False, "error": "Empty query"}
     try:
+        print("SEARCHING FOR: ", user)
+        # build filter for user to ONLY query their documents 
+        filter = {"user":user}
         # Direct Chroma vector store call to retrieve relevant documents based on similarity search
-        relevant_docs = vector_store.similarity_search(query, k=k)
+        relevant_docs = vector_store.similarity_search(
+            query, 
+            k=k,
+            filter=filter
+        )
         if not relevant_docs:
             return {"ok": True, "count": 0, "documents": []}
         docs_out = [
             {
                 "source": d.metadata.get("source"),
                 "page": d.metadata.get("page"),
+                "user": d.metadata.get("user"),
                 "text": d.page_content,
             }
             for d in relevant_docs
@@ -76,11 +84,11 @@ def query_vector_store(query: str, k: int=k_docs)-> dict:
     except Exception as err:
         return {"ok": False, "error": f"{type(err).__name__}: {err}"}
 
-def rag_response(query:str, history):
+def rag_response(query:str, history, user):
     """Generate a RAG response by retrieving relevant documents from the vector store 
         and using them as context for the LLM to generate an answer."""
     # retrieve relevant chunks from the vector db
-    res = query_vector_store(query)
+    res = query_vector_store(query, user)
     if not res['ok']:
         return {"ok":False, "error":res["error"]}
     # extract text from chunks and combine them to pass as context
@@ -97,18 +105,18 @@ def rag_response(query:str, history):
     - Keep answer short (<200 words)
     - Use bullet points for multiple facts
     - Do not hallucinate
-    If the context does not contain information to answer the question, respond with: "I don't have enough information from the provided documents to answer that."
-    """
+    If the context is incomplete, still answer using the relevant parts. Only say you don't have enough information if nothing is relevant.    """
     # - Include source references: [1], [2], ...
 
     try:
+        print("HAGA", prompt)
         # build history with RAG prompt for answer with context and previous conversation 
         messages_with_context = history + [HumanMessage(content=prompt)]
         response = llm.invoke(messages_with_context)
         answer = response.content
-        print("RES ",answer)
-        for doc in res['documents']:
-            print(doc['text'])
+        # print("RES ",answer)
+        # for doc in res['documents']:
+        #     # print(doc['text'])
         return {"ok": True, "answer": answer, "source_docs": res["documents"]}
 
     except Exception as err:
@@ -160,7 +168,7 @@ Schema: {{"facts": [...], "goals": [...], "context": [...], "topics": [...]}}
         print("Failed to parse JSON, keeping old memory")
         return memory
 
-def query_llm(query:str):
+def query_llm(query:str, user):
     """Main function to handle a RAG query by managing the chat history, 
        retrieving relevant context, and generating a response using the LLM.
     """
@@ -171,7 +179,7 @@ def query_llm(query:str):
     # construct messages with system message, chat history and current query
     messages = [system_msg] + chat
     # query LLM and get response, update chat history with new messages
-    response = rag_response(query, messages)
+    response = rag_response(query, messages, user)
     if not response['ok']:
         return {"ok": False, "error": response["error"]}
     

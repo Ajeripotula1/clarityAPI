@@ -8,9 +8,9 @@ import os
 
 # how long(seconds) we keep summaries before they turn stale
 ttl = os.getenv("MEMORY_TTL")
-async def summarize_file(file_name:str):
+async def summarize_file(file_name:str, user: str):
     """Generate Summary from all chunks that match input source"""
-
+    print("running??")
     # Multi Page Summaries Process
     # Use Map Reduce:
         # Generate Summary of smaller chunks
@@ -39,8 +39,15 @@ async def summarize_file(file_name:str):
         # Otherwise, generate and cache the summary
         print("*** GENERATING SUMMARY ***")    
         
-        # query all relevant documents based on source
-        results = vector_db.get(where={"source": file_name})
+        # query all relevant documents based on user AND the source name
+        results = vector_db.get(where={
+                "$and": [
+                    {"user":user},
+                    {"source": file_name}
+                ]
+            }
+        )
+            
         # convert retrieved dict into Document Obj
         source_documents = [
             Document(page_content=text, metadata=meta)

@@ -7,6 +7,8 @@ load_dotenv()
 
 model = os.getenv('MODEL')
 
+redis_password = os.getenv('REDIS_PASSWORD')
+
 temperature = os.getenv('TEMPERATURE')
 
 llm = ChatOpenAI(model=model, temperature=temperature)
@@ -26,9 +28,10 @@ vector_store = Chroma(
     )
 print("Created Vector store ",vector_store._collection.count()) 
 
-# Create Redis Client
+# Create Redis Client that points to Docker redis image 
 redis = Redis(
     host="localhost",
     port=6379,
+    password = redis_password,
     decode_responses=True # str instead of bytes
 )

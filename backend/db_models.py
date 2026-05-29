@@ -18,6 +18,6 @@ class Documents(Base):
     id = Column(String, primary_key=True, nullable=False)
     # link to user 
     user_id = Column(String, ForeignKey('users.id'), nullable=False)
-    filename = Column(String, nullable=False)
+    file_name = Column(String, nullable=False)
     storage_url = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
