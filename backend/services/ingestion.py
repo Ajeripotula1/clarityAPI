@@ -8,7 +8,7 @@ import pdfplumber, os, hashlib
 from pathlib import Path
 from core.config import vector_store
 # --- 1. Process the file and extract text ---
-def process_file(file_name:str, file_path)-> list[Document]:
+def process_file(user:str, file_name:str, file_path)-> list[Document]:
     file_path = Path(file_path)
     if not file_path.exists():
         raise FileNotFoundError(f"knowledgeBase file not found: {file_path}")
@@ -23,7 +23,8 @@ def process_file(file_name:str, file_path)-> list[Document]:
                 pages.append(
                     Document(
                         page_content=text.strip(),
-                        metadata={"page" : i+1,"source": file_name} 
+                        # add use, page number, and file name for each chunk
+                        metadata={"user": user, "page" : i+1,"source": file_name} 
                     )
                 )
     # pass text content from all pages to be chunked 
@@ -65,10 +66,10 @@ def add_to_vectorDB(chunks):
         print(f"add_documents failed: {type(err).__name__}: {err}")
         return False
 
-def ingest(file_name, file_path):
+def ingest(user, file_name, file_path):
     """Reads text from a file, converts it into chunks, and stores them in vector DB"""
     try:
-        documents = process_file(file_name, file_path)
+        documents = process_file(user, file_name, file_path)
         if not documents:
             return {"ok": False, "error": "No pages extracted"}
         chunks = chunk(documents)
