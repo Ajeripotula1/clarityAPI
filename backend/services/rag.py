@@ -1,42 +1,86 @@
 from core.config import llm, vector_store, redis
 from typing import Dict, List
 import os, json
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
 
 ### This file contains the core logic for the RAG (Retrieval-Augmented Generation) system, including:
 # - querying the vector store for relevant documents based on user queries
 # - managing chat history and user memory to provide context for the LLM
 # - generating responses using the LLM with retrieved context and chat history
 
+# how long(seconds) we keep chat memory and messages before they turn stale
+ttl = os.getenv("MEMORY_TTL")
+
 # SESSION_STORE: Dict[str,List] = {} # session store for RAG, can be used to maintain separate chat histories for different users/sessions
 k_docs = int(os.getenv('RELEVANT_DOCS_K', 3))
 max_chat_history_len = int(os.getenv('CHAT_HISTORY_LENGTH'))
 
-# chat history to maintain the order of conversation and provide context to the LLM for generating relevant responses. 
-chat_history: List = []
-# Summarized memory to be injected into prompt for context and relevant information
-chat_memory = {
+EMPTY_MEMORY = {
         "facts":[],
         "goals":[],
         "context":[],
         "topics":[]
 }
-# Getters and setter to maintain global chat history and memory    
-def get_chat_history():
-    return chat_history
 
-def update_chat_history(updated_history:List):
-    global chat_history 
-    chat_history = updated_history
+async def get_chat_history(user_id:str):
+    # build key for chat history 
+    chat_key = f"chat:{user_id}:history"
+    # look up redis cache
+    raw_chat = await redis.get(chat_key)
+    # print(f"Looking chat up for {user_id}: {raw_chat}")
+    # convert chat back into LangChain Messages for LLM
+    return _deserialize_history(raw_chat) if raw_chat else []
 
-def get_chat_memory():
-    return chat_memory
+async def set_chat_history(user_id, raw_chat):
+    # convert LangChain messages into JSON string for storage and store
+    # build key for chat history 
+    chat_key = f"chat:{user_id}:history"
+    await redis.set(chat_key, _serialize_history(raw_chat),ex=ttl)
 
-def update_chat_memory(updated_memory:Dict):
-    global chat_memory
-    chat_memory = updated_memory   
+
+async def get_chat_memory(user_id:str):
+    """retrieve chat memory and convert it back to Py Obj"""
+    # build key for chat memory 
+    chat_key = f"chat:{user_id}:memory"
+    # look up redis cache
+    raw_memory = await redis.get(chat_key)
+    # print(f"Looking memory up for {user_id}: {raw_memory}")
+    # JSON str -> Py Obj
+    return json.loads(raw_memory) if raw_memory else dict(EMPTY_MEMORY)
+
+async def set_chat_memory(user_id, memory):
+    """convert Py obj into JSON str for storage"""
+    # build key for chat history 
+    chat_key = f"chat:{user_id}:memory"
+    await redis.set(chat_key, json.dumps(memory), ex=ttl)
+
+def _serialize_history(messages: List[BaseMessage]) -> str:
+    """Convert Obj into JSON String for data storage"""
+    out = []
+    # LangChain Messages obj -> dict
+    for m in messages:
+        if isinstance(m, HumanMessage):
+            out.append({"role": "human", "content": m.content})
+        elif isinstance(m, AIMessage):
+            out.append({"role": "ai", "content": m.content})
+    # Dict -> JSON str
+    return json.dumps(out)
+
+def _deserialize_history(raw: str) -> List[BaseMessage]:
+    """Convert JSON String into obj to reconstruct LangChain msgs for sending to LLM"""
+    if not raw:
+        return []
+    # JSON str -> DICT
+    messages = json.loads(raw)
+    llm_messages: List[BaseMessage] = []
+    # DICT -> LangChain Messages
+    for m in messages:
+        if m["role"] == "human":
+            llm_messages.append(HumanMessage(content=m["content"]))
+        elif m["role"] == "ai":
+            llm_messages.append(AIMessage(content=m["content"]))
     
-
+    return llm_messages
 
 
 def generate_system_message(memory:Dict):
@@ -60,7 +104,7 @@ def query_vector_store(query: str, user:str, k: int=k_docs)-> dict:
     if not query:
         return {"ok": False, "error": "Empty query"}
     try:
-        print("SEARCHING FOR: ", user)
+        # print("SEARCHING FOR: ", user)
         # build filter for user to ONLY query their documents 
         filter = {"user":user}
         # Direct Chroma vector store call to retrieve relevant documents based on similarity search
@@ -109,7 +153,7 @@ def rag_response(query:str, history, user):
     # - Include source references: [1], [2], ...
 
     try:
-        print("HAGA", prompt)
+        # print("HAGA", prompt)
         # build history with RAG prompt for answer with context and previous conversation 
         messages_with_context = history + [HumanMessage(content=prompt)]
         response = llm.invoke(messages_with_context)
@@ -120,7 +164,8 @@ def rag_response(query:str, history, user):
         return {"ok": True, "answer": answer, "source_docs": res["documents"]}
 
     except Exception as err:
-        return {"ok": False, "error": f"{type(err).__name__}: {err}"}
+        # print("caught error")
+        return {"ok": False, "answer": f"{type(err).__name__}: {err}"}
 
 # update memory to include the messages that will be "forgotten"
 def summarize_history(memory, old_messages):
@@ -145,20 +190,19 @@ def summarize_history(memory, old_messages):
     # """
     
     prompt = f"""
-You are summarizing the conversation history.
-Current memory:
-{memory}
-Conversation to summarize:
-{formatted_messages}
-Extract and update:
-- goals (user's objectives from chat)
-- context (key chat points)
-- topics (chat subjects)
-- facts (only user-related or chat-derived or user preferences for chat)
-Return JSON only. Do not include any prose or markdown fences.
-Schema: {{"facts": [...], "goals": [...], "context": [...], "topics": [...]}}
-
-"""
+    You are summarizing the conversation history.
+    Current memory:
+    {memory}
+    Conversation to summarize:
+    {formatted_messages}
+    Extract and update:
+    - goals (user's objectives from chat)
+    - context (key chat points)
+    - topics (chat subjects)
+    - facts (only user-related or chat-derived or user preferences for chat)
+    Return JSON only. Do not include any prose or markdown fences.
+    Schema: {{"facts": [...], "goals": [...], "context": [...], "topics": [...]}}
+    """
     
     response = llm.invoke([HumanMessage(content=prompt)])
     # print('summarizing', formatted_messages, response.content, len(formatted_messages))
@@ -168,14 +212,16 @@ Schema: {{"facts": [...], "goals": [...], "context": [...], "topics": [...]}}
         print("Failed to parse JSON, keeping old memory")
         return memory
 
-def query_llm(query:str, user):
+async def query_llm(query:str, user):
     """Main function to handle a RAG query by managing the chat history, 
        retrieving relevant context, and generating a response using the LLM.
     """
-    # retrieve global chat history and context
-    chat = get_chat_history()
+    # retrieve global chat history and context for specific user
+    chat = await get_chat_history(user)
+    memory = await get_chat_memory(user)
+    # print('RETRIEVED: ', chat, memory)
     # construct system message with injected context
-    system_msg = generate_system_message(get_chat_memory())
+    system_msg = generate_system_message(memory)
     # construct messages with system message, chat history and current query
     messages = [system_msg] + chat
     # query LLM and get response, update chat history with new messages
@@ -189,19 +235,18 @@ def query_llm(query:str, user):
     answer = response['answer']
     # print("ANSWER", answer)
     chat.append(AIMessage(content=answer))
-    update_chat_history(chat)
-    # print('final len', len(chat))
     # manage chat history length by summarizing older messages and maintaining recent messages when we reach capacity
     # once we are at capacity, we summarize the first half, and maintain the second half as it is 
     if len(chat) >= max_chat_history_len:
-        print("overflow!", len(chat_history))
+        # print("overflow!", len(chat_history))
         old_msgs = chat[:max_chat_history_len//2]
         # pass 1st half to summarize and update memory
-        updated_memory = summarize_history(get_chat_memory(), old_msgs)
-        update_chat_memory(updated_memory)
+        updated_memory = summarize_history(memory, old_msgs)
+        await set_chat_memory(user, updated_memory)
         # keep ONLY recent after summarizing
-        update_chat_history(chat[max_chat_history_len//2:])
-        print('final len', len(chat), updated_memory)
+        chat = chat[max_chat_history_len//2:]
+    await set_chat_history(user, chat)
+    # print('final len', len(chat))
     # for ch in chat_history:
     #     print(ch.content)
     # print("--DONE--")

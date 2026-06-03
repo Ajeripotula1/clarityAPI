@@ -10,14 +10,13 @@ import os
 ttl = os.getenv("MEMORY_TTL")
 async def summarize_file(file_name:str, user: str):
     """Generate Summary from all chunks that match input source"""
-    print("running??")
     # Multi Page Summaries Process
     # Use Map Reduce:
         # Generate Summary of smaller chunks
         # Generate and return summary of summaries to be combined
     try:
         # check if summary exists in the cache 
-        cache_key = f"summary:{file_name}"
+        cache_key = f"summary:{user}:{file_name}"
         cached = await redis.get(cache_key)
         if cached:
             print("*** SUMMARY EXISTS IN CACHE ***")

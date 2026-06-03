@@ -3,11 +3,12 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+load_dotenv(override=False)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 # URL format: postgresql+psycopg://username:password@host:port/database
 if not DATABASE_URL:
+    print("YO", DATABASE_URL)
     raise ValueError("Database URL not found in environment variable")
 
 # Create SQL Alchemy Engine (connection manager)

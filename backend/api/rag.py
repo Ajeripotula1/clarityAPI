@@ -15,9 +15,8 @@ router=APIRouter(
 
     
 @router.post('/query', response_model=ChatResponse)
-def rag(payload:ChatRequest, user = Depends(get_current_user)):
-    print("testing,", user)
-    response = query_llm(payload.query, user)
+async def rag(payload:ChatRequest, user = Depends(get_current_user)):
+    response = await query_llm(payload.query, user)
     # print(response)
     return ChatResponse(ok=response["ok"], answer=response["answer"])
 

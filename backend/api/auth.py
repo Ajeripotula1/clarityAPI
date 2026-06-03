@@ -20,7 +20,9 @@ router = APIRouter(
 )
 
 #### Token Utilities ####
-SECRET_KEY = os.getenv("SECRET_KEY") 
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY must be set in environment")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -52,7 +54,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     try: 
         # decode the token
         payload = jwt.decode(token, SECRET_KEY, algorithms = [ALGORITHM])
-        print(f"🔍 DEBUG: Decoded payload: {payload}")
+        # print(f"🔍 DEBUG: Decoded payload: {payload}")
         # extract the user id (sub)
         user_id = payload.get("sub")
         if user_id is None:
@@ -108,7 +110,7 @@ async def register(user: UserCreate, db: Session = Depends (get_db)):
         username=user.username, 
         password=hashed_password
     ) 
-    print(new_user)
+    # print(new_user)
     # add to database
     db.add(new_user)
     db.commit()
@@ -145,6 +147,6 @@ async def login(form_data:OAuth2PasswordRequestForm = Depends(), db:Session = De
             headers={"WWW-Authenticate": "Bearer"},
         )
     # user is authenticated, create and assign JWT Token 
-    print('creating token for ', db_user.username, db_user.id)
+    # print('creating token for ', db_user.username, db_user.id)
     access_token = create_access_token(data={"sub": db_user.id})
     return Token(access_token=access_token, token_type='bearer')
