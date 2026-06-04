@@ -23,12 +23,27 @@ Effective studying requires understanding dense material, breaking it down, and 
 Clarity centralizes studying into a single system powered by RAG:
 
 - Retrieves relevant document chunks using vector similarity search
-- Injects context into LLM prompts to generate grounded responses
-- Generates structured outputs (summaries, flashcards) from retrieved content
-- Caches expensive operations using Redis to reduce latency and cost
+- Injects relevent context into LLM prompts to generate grounded responses
+- Generates structured outputs (summaries, flashcards) from your uploaded content
+- Support multi-turn, context-aware Q&A using conversational memory
+- Caches expensive operations using Redis to reduce latency and API cost
+- Supports multi user with JWT based authentication and per-user document isolation
 
 ---
 
+## ⚙️ Features
+
+- **Upload Files** — Add `.txt` and `.pdf` files to your knowledge base
+- **Searchable Memory** — Semantic vector search using OpenAI embeddings + ChromaDB vector database
+- **Chat with Your Notes** — Multi-turn Q&A with conversational memory and context groudning
+- **Smart Summaries** — Extract Big Ideas, Key Terms, and concise takeaways from large documents
+- **Flashcard Generator** — Automatically generate Q&A pairs for active recall and spaced repetition
+- **Metadata Filtering** — Scoped retrieval per user and per document for percise, relevant results
+- **Caching Layer** — Redis caching for faster responses and lower OpenAI API cost
+- **Multi-User Auth** — JWT authentication with PostgreSQL-backed user and document persistence
+- **Frontend UI (in progress)** — Clean, modular React interface
+
+---
 ## 🖼️ How to Use
 
 1. Upload your notes to the knowledge base
@@ -38,26 +53,14 @@ Clarity centralizes studying into a single system powered by RAG:
 
 ---
 
-## ⚙️ Features
 
-- 📂 **Upload Files** — Add `.txt` and `.pdf` files to your knowledge base
-- 🔍 **Searchable Memory** — Uses embeddings + vector search for retrieval
-- 💬 **Chat with Your Notes** — Ask questions and get context-grounded answers
-- 🧠 **Smart Summaries** — Extract Big Ideas, Key Terms, and concise takeaways
-- 🎓 **Flashcard Generator** — Automatically generate Q&A pairs for studying
-- ⚡ **Caching Layer** — Redis caching for faster responses and lower cost
-- 🌐 **Frontend UI (Coming Soon)** — Clean, modular React interface
+## 🤖 Clarity uses
 
----
-
-## 🤖 How It Works
-
-Clarity uses:
-
-- **LLMs (via LangChain)** to interpret queries and generate responses
+- **LLMs (via OpenAI GPT-4o mini LangChain)** to interpret queries and generate responses
 - **ChromaDB** for semantic vector search across uploaded notes
 - **FastAPI** for backend API and orchestration
-- **Redis** for caching summaries and flashcards
+- **Redis** for caching summaries, flashcards, and session conversations
+- **PostgreSQL** for persisting user and document information 
 
 > Answers are grounded in your uploaded material, which serves as the source of truth.
 
@@ -72,29 +75,116 @@ Clarity uses:
 | **RAG**          | LangChain           |
 | **Embeddings**   | OpenAI Embeddings   |
 | **Vector Store** | ChromaDB            |
-| **Frontend**     | React (coming soon) |
+| **Database**     | PostgreSQL          |
 | **Caching**      | Redis               |
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ How it Works
 
-### Query Flow:
+### Query Flow
+ 
+```
+User submits question
+       ↓
+Query embedded via OpenAI Embeddings
+       ↓
+Top-K chunks retrieved from ChromaDB (with metadata filtering)
+       ↓
+Conversational memory prepended to prompt
+       ↓
+LLM (GPT-4o mini via LangChain) generates grounded response
+       ↓
+Response cached in Redis (TTL-based)
+```
+ 
+### Ingestion Flow
+ 
+```
+User uploads document
+       ↓
+Document parsed and split into chunks
+       ↓
+Chunks embedded via OpenAI Embeddings
+       ↓
+Embeddings + metadata stored in ChromaDB
+       ↓
+File reference persisted to PostgreSQL
+```
+ 
+### Auth Flow
+ 
+```
+User registers / logs in
+       ↓
+JWT token issued and stored client-side
+       ↓
+Token verified on each protected route
+       ↓
+Requests scoped to authenticated user's documents
+```
 
-1. User submits a question
-2. Query is embedded using OpenAI embeddings
-3. Top-K relevant chunks are retrieved from ChromaDB
-4. Retrieved context is injected into the LLM prompt
-5. LLM generates a grounded response
-6. Response is optionally cached in Redis
+---
 
-### Ingestion Flow:
-
-1. User uploads document
-2. Document is parsed and split into chunks
-3. Chunks are converted into embeddings
-4. Stored in ChromaDB for retrieval
-
+## 🚀 Getting Started
+ 
+**Prerequisites:** Docker and Docker Compose
+ 
+```bash
+# Clone the repository
+git clone https://github.com/Ajeripotula1/ClarityAPI
+cd ClarityAPI/backend
+ 
+# Configure environment
+cp .env.example .env
+# Fill in the required values (see Environment Variables below)
+ 
+# Build and start all services (API + PostgreSQL + Redis)
+docker compose up -d --build
+```
+ 
+The API will be available at `http://localhost:8000`. Postgres is exposed on `5433` (to avoid conflicts with a local instance) and Redis on `6379`.
+ 
+> The API container waits for Postgres to pass its healthcheck before starting, so migrations run automatically via `entrypoint.sh` — no manual migration step needed.
+ 
+### Environment Variables
+ 
+Create a `.env` file in `backend/` with the following:
+ 
+```env
+# OpenAI
+OPENAI_API_KEY=your_key_here
+ 
+# Postgres
+POSTGRES_USER=clarity
+POSTGRES_PASSWORD=yourpassword
+POSTGRES_DB=clarity_db
+ 
+# Redis
+REDIS_PASSWORD=yourredispassword
+ 
+# Auth
+JWT_SECRET_KEY=your_jwt_secret
+```
+ 
+> `DATABASE_URL` and `REDIS_HOST` are set automatically by Docker Compose and do not need to be added manually.
+ 
+### Useful Commands
+ 
+```bash
+# View logs
+docker compose logs -f api
+ 
+# Stop all services
+docker compose down
+ 
+# Stop and remove volumes (full reset)
+docker compose down -v
+ 
+# Rebuild after code changes
+docker compose up -d --build api
+```
+ 
 ---
 
 ## 🔑 Key Concepts / Highlights
@@ -108,77 +198,14 @@ Clarity uses:
 
 ## ⚠️ Challenges & Learnings
 
-Tuning chunk size and top-K retrieval for relevant context
-Reducing hallucinations through strict prompt grounding
-Managing API cost and latency with Redis caching
-Structuring large document summaries using map-reduce pipelines
+- Tuning chunk size and top-K retrieval for relevant context
+- Reducing hallucinations through strict prompt grounding
+- Managing API cost and latency with Redis caching
+- Structuring large document summaries using map-reduce pipelines
 
 ---
-
-## 🚀 Getting Started
-
-```bash
-# Clone the repository
-git clone https://github.com/Ajeripotula1/ClarityAPI
-cd clarity
-
-# Create virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create a .env file and configure:
-MODEL=gpt-4o-mini
-TEMPERATURE=0.7
-OPENAI_API_KEY=your_key_here
-CHAT_HISTORY_LENGTH=6
-RELEVANT_DOCS_K=3
-MEMORY_TTL=3600
-
-# Start backend
-uvicorn app.main:app --reload
-
-# In a separate terminal, start Redis
-redis-server
-```
-
-## 📂 Project Structure
-
-```
-clarityAPI/
-    backend/
-        api/ # routers for services
-            upload.py
-            rag.py
-            summary.py
-            flashcard.py
-
-        core/
-            config.py # llm, embeddings, vector DB, redis client setup
-            db/
-                chroma_db/ # persisted vector store
-        knowledgeBase/ # where the user's uploaded file are stored for processing
-            file1.pdf
-            file2.pdf
-            file3.pdf
-        models/
-            schema.py # Pydantic Models data validation
-        services/ # Backend logic for features
-            ingestion.py   # file processing, chunking, and storing to vector db
-            summarize.py   # map reduce summary
-            rag.py         # context driven chat with LLM
-            flashcards.py  # Question answer pairs derived from summary
-        .env
-        main.py
-        requirements.txt
-        README.md
-```
 
 ## 🔮 Future Improvements (Coming soon)
 
 - React UI
-- Long Term persistent memory (relational DB)
-- Multi user support with JWT authentication
 - Deployment to cloud infrastructure (AWS)
