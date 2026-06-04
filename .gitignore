@@ -94,3 +94,4 @@ appendonly.aof
 docs/
 graphify-out/
 knowledgeBase/
+temp/
