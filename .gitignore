@@ -90,3 +90,6 @@ tmp/
 # ----------------------
 dump.rdb
 appendonly.aof
+
+/docs
+/graphify-out
