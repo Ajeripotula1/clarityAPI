@@ -91,5 +91,6 @@ tmp/
 dump.rdb
 appendonly.aof
 
-/docs
-/graphify-out
+docs/
+graphify-out/
+knowledgeBase/
